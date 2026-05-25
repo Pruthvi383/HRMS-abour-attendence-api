@@ -18,7 +18,10 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,10 +38,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AttendanceService {
 
+    private static final String ACTIVE_WORKERS_KEY = "active:workers";
+
     private final WorkerRepository workerRepository;
     private final SiteRepository siteRepository;
     private final AttendanceLogRepository attendanceLogRepository;
     private final OvertimeEntryRepository overtimeEntryRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${app.overtime.standard-shift-hours:8}")
     private int standardShiftHours;
@@ -51,15 +58,19 @@ public class AttendanceService {
     private int monthlyCapHours;
     @Value("${app.overtime.max-shift-hours:16}")
     private int maxShiftHours;
+    @Value("${app.redis.active-workers-ttl-hours:16}")
+    private int activeTtlHours;
 
     public AttendanceService(WorkerRepository workerRepository,
                              SiteRepository siteRepository,
                              AttendanceLogRepository attendanceLogRepository,
-                             OvertimeEntryRepository overtimeEntryRepository) {
+                             OvertimeEntryRepository overtimeEntryRepository,
+                             RedisTemplate<String, Object> redisTemplate) {
         this.workerRepository = workerRepository;
         this.siteRepository = siteRepository;
         this.attendanceLogRepository = attendanceLogRepository;
         this.overtimeEntryRepository = overtimeEntryRepository;
+        this.redisTemplate = redisTemplate;
     }
 
     @Transactional
@@ -89,8 +100,21 @@ public class AttendanceService {
         AttendanceLog log = new AttendanceLog();
         log.setWorker(worker);
         log.setSite(site);
-        log.setClockInTime(LocalDateTime.now());
-        return AttendanceResponse.fromEntity(attendanceLogRepository.save(log));
+        LocalDateTime now = LocalDateTime.now();
+        log.setClockInTime(now);
+        AttendanceLog saved = attendanceLogRepository.save(log);
+
+        Map<String, Object> workerData = Map.of(
+            "workerId", workerId,
+            "workerName", worker.getName(),
+            "siteId", siteId,
+            "siteName", site.getSiteName(),
+            "clockInTime", now.toString(),
+            "designation", worker.getDesignation().name()
+        );
+        redisTemplate.opsForValue().set(ACTIVE_WORKERS_KEY + ":" + workerId, workerData, Duration.ofHours(activeTtlHours));
+
+        return AttendanceResponse.fromEntity(saved);
     }
 
     @Transactional
@@ -118,11 +142,34 @@ public class AttendanceService {
             attendance.setOvertimeHours(BigDecimal.ZERO);
         }
 
-        return AttendanceResponse.fromEntity(attendanceLogRepository.save(attendance));
+        AttendanceLog saved = attendanceLogRepository.save(attendance);
+        try {
+            redisTemplate.delete(ACTIVE_WORKERS_KEY + ":" + workerId);
+        } catch (RuntimeException e) {
+            log.warn("Failed to remove worker {} from Redis active set: {}", workerId, e.getMessage());
+        }
+
+        return AttendanceResponse.fromEntity(saved);
     }
 
     public List<ActiveWorkerResponse> getActiveWorkers() {
-        return List.of();
+        Set<String> keys = redisTemplate.keys(ACTIVE_WORKERS_KEY + ":*");
+        if (keys == null || keys.isEmpty()) {
+            return List.of();
+        }
+
+        List<ActiveWorkerResponse> result = new ArrayList<>();
+        for (String key : keys) {
+            try {
+                Object val = redisTemplate.opsForValue().get(key);
+                if (val instanceof Map<?, ?> map) {
+                    result.add(ActiveWorkerResponse.fromMap((Map<String, Object>) map));
+                }
+            } catch (RuntimeException e) {
+                log.warn("Failed to read active worker from Redis key {}: {}", key, e.getMessage());
+            }
+        }
+        return result;
     }
 
     public PagedResponse<AttendanceResponse> getAttendanceLog(Long workerId, LocalDate from, LocalDate to, int page, int size) {

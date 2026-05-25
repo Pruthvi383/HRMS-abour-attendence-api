@@ -4,6 +4,7 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -64,5 +65,10 @@ public class RedisConfig {
         return RedisCacheManager.builder(factory)
             .cacheDefaults(config)
             .build();
+    }
+
+    @Bean
+    public CacheErrorHandler errorHandler() {
+        return new CustomCacheErrorHandler();
     }
 }

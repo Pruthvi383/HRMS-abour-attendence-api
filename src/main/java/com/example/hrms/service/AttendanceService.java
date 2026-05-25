@@ -112,7 +112,11 @@ public class AttendanceService {
             "clockInTime", now.toString(),
             "designation", worker.getDesignation().name()
         );
-        redisTemplate.opsForValue().set(ACTIVE_WORKERS_KEY + ":" + workerId, workerData, Duration.ofHours(activeTtlHours));
+        try {
+            redisTemplate.opsForValue().set(ACTIVE_WORKERS_KEY + ":" + workerId, workerData, Duration.ofHours(activeTtlHours));
+        } catch (RuntimeException e) {
+            log.warn("Failed to add worker {} to Redis active set: {}", workerId, e.getMessage());
+        }
 
         return AttendanceResponse.fromEntity(saved);
     }
@@ -153,7 +157,13 @@ public class AttendanceService {
     }
 
     public List<ActiveWorkerResponse> getActiveWorkers() {
-        Set<String> keys = redisTemplate.keys(ACTIVE_WORKERS_KEY + ":*");
+        Set<String> keys;
+        try {
+            keys = redisTemplate.keys(ACTIVE_WORKERS_KEY + ":*");
+        } catch (RuntimeException e) {
+            log.warn("Failed to read active worker keys from Redis: {}", e.getMessage());
+            return List.of();
+        }
         if (keys == null || keys.isEmpty()) {
             return List.of();
         }

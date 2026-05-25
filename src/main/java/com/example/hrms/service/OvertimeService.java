@@ -6,6 +6,7 @@ import com.example.hrms.dto.SettlementResponse;
 import com.example.hrms.entity.OvertimeEntry;
 import com.example.hrms.entity.Worker;
 import com.example.hrms.enums.SettlementStatus;
+import com.example.hrms.event.OvertimeSettledEvent;
 import com.example.hrms.exception.ApiException;
 import com.example.hrms.exception.ErrorCode;
 import com.example.hrms.repository.OvertimeEntryRepository;
@@ -15,6 +16,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +27,14 @@ public class OvertimeService {
 
     private final WorkerRepository workerRepository;
     private final OvertimeEntryRepository overtimeEntryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OvertimeService(WorkerRepository workerRepository,
-                           OvertimeEntryRepository overtimeEntryRepository) {
+                           OvertimeEntryRepository overtimeEntryRepository,
+                           ApplicationEventPublisher eventPublisher) {
         this.workerRepository = workerRepository;
         this.overtimeEntryRepository = overtimeEntryRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +105,8 @@ public class OvertimeService {
             totalAmount = totalAmount.add(entry.getAmount());
         }
         overtimeEntryRepository.saveAll(entries);
+        eventPublisher.publishEvent(new OvertimeSettledEvent(
+            workerId, worker.getName(), worker.getPhone(), month, totalAmount));
 
         return SettlementResponse.builder()
             .workerId(workerId)

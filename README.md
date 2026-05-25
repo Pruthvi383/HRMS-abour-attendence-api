@@ -68,6 +68,33 @@ open http://localhost:8080/swagger-ui.html
 
 For staging, use `SPRING_PROFILES_ACTIVE=staging` and set `SUPABASE_POOLER_URL`.
 
+## Java Backend Hosting
+
+This repository includes a production Dockerfile and `render.yaml` blueprint for deploying the Spring Boot API as a Render web service.
+
+Render setup:
+
+1. Open Render and create a new Blueprint from this GitHub repo.
+2. Render reads `render.yaml`, builds the Docker image, and starts the Spring Boot jar.
+3. Add these environment variables when prompted:
+
+```bash
+SPRING_PROFILES_ACTIVE=staging
+SUPABASE_POOLER_URL=jdbc:postgresql://[project].pooler.supabase.com:6543/postgres
+SUPABASE_DB_USERNAME=postgres
+SUPABASE_DB_PASSWORD=[your-password]
+REDIS_HOST=[your-redis-host]
+REDIS_PORT=6379
+REDIS_PASSWORD=[your-redis-password]
+CORS_ALLOWED_ORIGINS=https://hrms-labour-attendance-api.vercel.app,http://localhost:3000
+```
+
+Health check:
+
+```bash
+curl https://[your-render-service].onrender.com/actuator/health
+```
+
 ## Supabase Setup
 
 1. Create a project at Supabase.

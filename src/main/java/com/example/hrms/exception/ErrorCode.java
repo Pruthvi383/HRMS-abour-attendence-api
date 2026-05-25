@@ -1,0 +1,15 @@
+package com.example.hrms.exception;
+
+public enum ErrorCode {
+    WORKER_NOT_FOUND,
+    SITE_NOT_FOUND,
+    WORKER_INACTIVE,
+    SITE_INACTIVE,
+    DUPLICATE_CLOCK_IN,
+    NOT_CLOCKED_IN,
+    FUTURE_CLOCK_IN,
+    ALREADY_SETTLED,
+    CURRENT_MONTH_SETTLEMENT,
+    NO_PENDING_OVERTIME,
+    VALIDATION_ERROR
+}

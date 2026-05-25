@@ -10,7 +10,6 @@ import com.example.hrms.entity.Worker;
 import com.example.hrms.exception.ApiException;
 import com.example.hrms.exception.ErrorCode;
 import com.example.hrms.repository.AttendanceLogRepository;
-import com.example.hrms.repository.OvertimeEntryRepository;
 import com.example.hrms.repository.SiteRepository;
 import com.example.hrms.repository.WorkerRepository;
 import java.math.BigDecimal;
@@ -43,7 +42,6 @@ public class AttendanceService {
     private final WorkerRepository workerRepository;
     private final SiteRepository siteRepository;
     private final AttendanceLogRepository attendanceLogRepository;
-    private final OvertimeEntryRepository overtimeEntryRepository;
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${app.overtime.standard-shift-hours:8}")
@@ -64,12 +62,10 @@ public class AttendanceService {
     public AttendanceService(WorkerRepository workerRepository,
                              SiteRepository siteRepository,
                              AttendanceLogRepository attendanceLogRepository,
-                             OvertimeEntryRepository overtimeEntryRepository,
                              RedisTemplate<String, Object> redisTemplate) {
         this.workerRepository = workerRepository;
         this.siteRepository = siteRepository;
         this.attendanceLogRepository = attendanceLogRepository;
-        this.overtimeEntryRepository = overtimeEntryRepository;
         this.redisTemplate = redisTemplate;
     }
 

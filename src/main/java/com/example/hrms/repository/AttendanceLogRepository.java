@@ -17,6 +17,7 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, Lo
     @Query("SELECT a FROM AttendanceLog a JOIN FETCH a.site WHERE a.worker.id = :workerId AND a.clockOutTime IS NULL")
     Optional<AttendanceLog> findActiveByWorkerId(@Param("workerId") Long workerId);
 
+    // JOIN FETCH keeps paged log responses to one content query instead of N+1 lazy loads.
     @Query(value = "SELECT a FROM AttendanceLog a JOIN FETCH a.worker JOIN FETCH a.site "
         + "WHERE a.worker.id = :workerId AND a.clockInTime >= :from AND a.clockInTime <= :to",
         countQuery = "SELECT COUNT(a) FROM AttendanceLog a WHERE a.worker.id = :workerId "
